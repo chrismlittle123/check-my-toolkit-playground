@@ -1,7 +1,7 @@
 # Bugs Found in check-my-code (cmc)
 
-> **Last Verified:** December 6, 2025 against v1.5.1
-> **Status:** Both bugs remain UNFIXED in latest version
+> **Last Verified:** December 6, 2025 against v1.5.5
+> **Status:** ✅ Both bugs have been FIXED in v1.5.5
 
 ---
 
@@ -9,8 +9,9 @@
 
 **Severity:** Critical
 **Command:** `cmc validate`
-**Affected Versions:** 1.4.5, 1.5.1 (still present)
-**Status:** ❌ NOT FIXED
+**Affected Versions:** 1.4.5, 1.5.1
+**Fixed In:** v1.5.5
+**Status:** ✅ FIXED
 
 ### Description
 The `cmc validate` command crashes with a file not found error because the `schemas` directory is missing from the npm package distribution.
@@ -50,8 +51,9 @@ No `schemas/` directory is present.
 
 **Severity:** Medium
 **Commands:** `cmc context --help`, error messages
-**Affected Versions:** 1.4.5, 1.5.1 (still present)
-**Status:** ❌ NOT FIXED
+**Affected Versions:** 1.4.5, 1.5.1
+**Fixed In:** v1.5.5
+**Status:** ✅ FIXED
 
 ### Description
 The help text and error messages show incorrect template name format that doesn't match the actual available templates.
@@ -111,7 +113,7 @@ The missing schema file issue exits with code 3, which is correct, but some erro
 
 ## Test Environment
 - **OS:** macOS Darwin 24.6.0
-- **cmc version:** Initially tested on 1.4.5, re-verified on 1.5.1
+- **cmc version:** Initially tested on 1.4.5, re-verified on 1.5.1, confirmed fixed in 1.5.5
 - **Node version:** >= 20 (as required)
 - **Install method:** npm global install
 
@@ -120,3 +122,4 @@ The missing schema file issue exits with code 3, which is correct, but some erro
 |------|---------|--------|--------|
 | 2025-12-06 | 1.4.5 | ❌ Present | ❌ Present |
 | 2025-12-06 | 1.5.1 | ❌ Present | ❌ Present |
+| 2025-12-06 | 1.5.5 | ✅ Fixed | ✅ Fixed |
