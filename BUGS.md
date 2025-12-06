@@ -1,7 +1,78 @@
 # Bugs Found in check-my-code (cmc)
 
 > **Last Verified:** December 6, 2025 against v1.5.5
-> **Status:** ✅ Both bugs have been FIXED in v1.5.5
+> **Status:** Bugs #1 and #2 FIXED in v1.5.5. **New bug #3 found in v1.5.5.**
+
+---
+
+## Bug #3: MCP Server `check_files` Tool Fails to Find Files (NEW - v1.5.5)
+
+**Severity:** High
+**Component:** MCP Server (`cmc mcp-server`)
+**Affected Versions:** 1.5.5
+**Status:** ❌ NOT FIXED
+
+### Description
+The MCP server's `check_files` tool fails to find files that exist and can be checked via the CLI. The tool appears to have path resolution issues:
+
+1. Relative paths return "No valid files found to check"
+2. Absolute paths have the leading `/` stripped, causing "No such file or directory" errors
+
+### Steps to Reproduce
+
+1. Start the MCP server (e.g., via Claude Code integration)
+2. Have a valid Python file at `test-bugs/newtest/test.py`
+3. Call `check_files` with relative path:
+```json
+{"files": ["test-bugs/newtest/test.py"]}
+```
+
+**Result:**
+```json
+{
+  "success": false,
+  "error": {
+    "code": "FILE_NOT_FOUND",
+    "message": "No valid files found to check"
+  }
+}
+```
+
+4. Call `check_files` with absolute path:
+```json
+{"files": ["/Users/.../test-bugs/newtest/test.py"]}
+```
+
+**Result:**
+```json
+{
+  "success": true,
+  "violations": [{
+    "file": "Users/.../test.py",  // Note: leading / stripped!
+    "rule": "E902",
+    "message": "No such file or directory (os error 2)"
+  }]
+}
+```
+
+### Expected Behavior
+The MCP `check_files` tool should find and lint files the same way the CLI does:
+```bash
+$ cmc check test-bugs/newtest/test.py
+test-bugs/newtest/test.py:1 [ruff/F401] `os` imported but unused
+```
+
+### Actual Behavior
+- Relative paths: Returns FILE_NOT_FOUND error
+- Absolute paths: Strips leading `/`, causing linter to fail with "No such file or directory"
+
+### Root Cause
+The MCP server appears to incorrectly resolve file paths relative to the project root or strips path prefixes incorrectly.
+
+### Impact
+- MCP integration with AI tools (Claude Code, Cursor) cannot check specific files
+- Users must rely on `check_project` instead of targeted file checks
+- `fix_files` tool is also affected (same path resolution issue)
 
 ---
 
@@ -118,8 +189,8 @@ The missing schema file issue exits with code 3, which is correct, but some erro
 - **Install method:** npm global install
 
 ## Verification History
-| Date | Version | Bug #1 | Bug #2 |
-|------|---------|--------|--------|
-| 2025-12-06 | 1.4.5 | ❌ Present | ❌ Present |
-| 2025-12-06 | 1.5.1 | ❌ Present | ❌ Present |
-| 2025-12-06 | 1.5.5 | ✅ Fixed | ✅ Fixed |
+| Date | Version | Bug #1 | Bug #2 | Bug #3 |
+|------|---------|--------|--------|--------|
+| 2025-12-06 | 1.4.5 | ❌ Present | ❌ Present | N/A |
+| 2025-12-06 | 1.5.1 | ❌ Present | ❌ Present | N/A |
+| 2025-12-06 | 1.5.5 | ✅ Fixed | ✅ Fixed | ❌ Present |
