@@ -82,6 +82,91 @@ Use `check_files` with explicit file paths instead of `check_project` with a dir
 
 ---
 
+## Bug: CLI `check` Command Ignores Multiple File Arguments
+
+**Severity:** High
+**Component:** CLI (`cmc check`)
+**Affected Versions:** 1.5.7
+**Status:** ❌ NOT FIXED
+
+### Description
+When passing multiple file paths to `cmc check`, only the first file is processed. All subsequent files are silently ignored.
+
+### Steps to Reproduce
+
+1. Have two Python files with lint violations:
+   - `test-bugs/test.py` (2 violations)
+   - `test-bugs/newtest/test.py` (2 violations)
+
+2. Run check with multiple files:
+```bash
+$ cmc check test-bugs/test.py test-bugs/newtest/test.py
+```
+
+**Result:**
+```
+test-bugs/test.py:2 [ruff/F401] `os` imported but unused
+test-bugs/test.py:3 [ruff/F401] `sys` imported but unused
+
+✗ 2 violations found
+```
+
+3. Reverse the order:
+```bash
+$ cmc check test-bugs/newtest/test.py test-bugs/test.py
+```
+
+**Result:**
+```
+test-bugs/newtest/test.py:1 [ruff/F401] `os` imported but unused
+test-bugs/newtest/test.py:2 [ruff/F401] `sys` imported but unused
+
+✗ 2 violations found
+```
+
+4. JSON output confirms only 1 file checked:
+```bash
+$ cmc check --json test-bugs/test.py test-bugs/newtest/test.py
+```
+```json
+{
+  "violations": [...],
+  "summary": {
+    "files_checked": 1,
+    "violations_count": 2
+  }
+}
+```
+
+5. MCP `check_files` handles multiple files correctly (4 violations found):
+```json
+{"files": ["test-bugs/newtest/test.py", "test-bugs/test.py"]}
+// Returns: files_checked: 2, 4 violations
+```
+
+### Expected Behavior
+All specified files should be checked and violations from all files should be reported.
+
+### Actual Behavior
+- Only the first file argument is processed
+- Subsequent file arguments are silently ignored
+- No warning or error is shown about ignored files
+- `files_checked` count confirms only 1 file was processed
+
+### Root Cause
+The CLI argument parser likely treats the `path` argument as a single value rather than accepting multiple values (variadic).
+
+### Impact
+- Users cannot check specific multiple files in a single command
+- Must run separate `cmc check` commands for each file
+- Inconsistent with MCP `check_files` which handles multiple files correctly
+- Silent failure is particularly problematic - users may think all files were checked
+
+### Workaround
+Run `cmc check` separately for each file, or use directory-based checking (`cmc check <directory>`).
+
+---
+
 ## Fixed Bugs
 
 ### ✅ FIXED in v1.5.7: MCP Server `check_files` Tool Path Resolution
