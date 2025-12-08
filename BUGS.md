@@ -2,7 +2,122 @@
 
 > **Last Verified:** December 8, 2025 against v1.5.9
 
-**No active bugs.** All previously reported issues have been fixed.
+## Active Bugs
+
+### BUG: CLI `--json` Flag Outputs Plain Text Errors Instead of JSON
+
+**Severity:** Medium
+
+**Description:** When using the `--json` flag with `cmc check`, errors are output as plain text instead of JSON format. This breaks JSON parsing in CI/CD pipelines and tooling that expects consistent JSON output.
+
+**Steps to Reproduce:**
+```bash
+$ cmc check --json nonexistent-file.py
+Error: Path not found: nonexistent-file.py
+$ echo $?
+2
+```
+
+**Expected Behavior:** Error should be returned as JSON:
+```json
+{
+  "error": {
+    "code": "CONFIG_ERROR",
+    "message": "Path not found: nonexistent-file.py"
+  }
+}
+```
+
+**Actual Behavior:** Plain text error message is output, breaking JSON consumers.
+
+**Location:** `src/cli/commands/check.ts` lines 28-41 - the catch block outputs plain text regardless of `options.json` flag.
+
+---
+
+### BUG: MCP `check_project` Returns "No Lintable Files" for Subdirectories with Own cmc.toml
+
+**Severity:** Medium
+
+**Description:** When calling `check_project` with a subdirectory path that contains its own `cmc.toml`, the MCP server finds the subdirectory's `cmc.toml` as the project root, but then the glob pattern fails to find files because it's searching relative to the wrong location.
+
+**Steps to Reproduce:**
+1. Have a project with nested `cmc.toml` files (e.g., `./cmc.toml` and `./test-bugs/cmc.toml`)
+2. Call `check_project` with `path: "test-bugs"`
+3. Result: `"No lintable files found"` despite files existing
+
+**MCP call:**
+```json
+{
+  "success": true,
+  "violations": [],
+  "files_checked": 0,
+  "has_violations": false,
+  "message": "No lintable files found"
+}
+```
+
+**CLI comparison (works correctly):**
+```bash
+$ cmc check test-bugs
+# Returns 16 violations from files in test-bugs/
+```
+
+**Root Cause:** The `loadProjectConfig(path)` function in `handlers.ts:53` searches for `cmc.toml` starting from the given path. When `test-bugs` has its own `cmc.toml`, it becomes the project root. Then `discoverFiles(targetPath, projectRoot)` is called with `targetPath` resolved from `process.cwd()`, but files are returned relative to `projectRoot` (test-bugs), creating a mismatch.
+
+**Location:** `src/mcp/handlers.ts` - `handleCheckProject()` function
+
+---
+
+### BUG: CLI `check` Does Not Support Glob Patterns
+
+**Severity:** Low
+
+**Description:** The CLI `check` command does not expand glob patterns. Users cannot use patterns like `*.py` or `src/**/*.ts` to select files.
+
+**Steps to Reproduce:**
+```bash
+$ cmc check "test-bugs/*.py"
+Error: Path not found: test-bugs/*.py
+$ echo $?
+2
+```
+
+**Expected Behavior:** Glob patterns should be expanded to match files.
+
+**Actual Behavior:** Glob pattern is treated as a literal path, which doesn't exist.
+
+**Note:** This may be intentional design, but is not documented. The shell usually expands globs, but quoted globs are not expanded.
+
+---
+
+### BUG: Broken Symlinks Cause "Path Not Found" Error Instead of Being Skipped
+
+**Severity:** Low
+
+**Description:** When a broken symlink exists in the project and is explicitly passed to `cmc check`, the CLI returns exit code 2 with "Path not found" error. While this is technically correct, broken symlinks discovered during directory traversal should be silently skipped rather than causing errors.
+
+**Steps to Reproduce:**
+```bash
+$ ln -s /nonexistent/file test-bugs/broken_symlink.ts
+$ cmc check test-bugs/broken_symlink.ts
+Error: Path not found: test-bugs/broken_symlink.ts
+$ echo $?
+2
+```
+
+**Note:** When scanning directories, broken symlinks are properly skipped. This only affects explicit file arguments.
+
+---
+
+### BUG: Warning Messages Printed to stderr Even in JSON Mode
+
+**Severity:** Low
+
+**Description:** When a linter is not installed (e.g., `ruff` or `eslint`), warning messages are printed to stderr even when `--json` flag is used. This can interfere with JSON parsing when stdout and stderr are combined.
+
+**Location:** `src/linter/runners.ts` lines 32-33, 72-73, 138-139 - `console.error()` calls for missing linters.
+
+**Expected Behavior:** In JSON mode, warnings should either be suppressed or included in the JSON output.
 
 ---
 
