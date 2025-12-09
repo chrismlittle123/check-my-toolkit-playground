@@ -1,10 +1,89 @@
 # Bugs Found in check-my-code (cmc)
 
-> **Last Verified:** December 9, 2025 against v1.6.2
+> **Last Verified:** December 9, 2025 against v1.6.3
 
 ## Active Bugs
 
-### BUG: `--quiet --json` Flags Together Produce No Output
+### BUG: `[files]` Section `include`/`exclude` Patterns Have No Effect
+
+**Severity:** High
+
+**Description:** The `[files]` section in `cmc.toml` with `include` and `exclude` patterns is completely ignored. Files are linted regardless of these patterns. The config validates successfully but has no effect on which files are checked.
+
+**Steps to Reproduce:**
+```bash
+mkdir -p src vendor
+echo 'const x = 1;' > src/app.ts
+echo 'const y = 2;' > vendor/lib.ts
+echo 'const z = 3;' > root.ts
+
+cat > cmc.toml << 'EOF'
+[project]
+name = "test"
+
+[files]
+include = ["src/**/*.ts"]
+exclude = ["vendor/**/*"]
+EOF
+
+cmc check .
+# Expected: Only src/app.ts checked
+# Actual: All 3 files are checked!
+```
+
+**Expected Behavior:** Only files matching `include` patterns (excluding those matching `exclude`) should be checked.
+
+**Actual Behavior:** All TypeScript files in the directory are checked regardless of `[files]` settings.
+
+**Additional Finding:** The `[files]` section accepts any arbitrary keys without validation:
+```bash
+cat > cmc.toml << 'EOF'
+[project]
+name = "test"
+
+[files]
+totally_invalid_key = ["test"]
+EOF
+
+cmc validate
+# Output: ✓ cmc.toml is valid
+```
+
+---
+
+### BUG: Invalid Linter Names in `[rulesets]` Are Silently Ignored
+
+**Severity:** Medium
+
+**Description:** Using an invalid linter name in the `[rulesets]` section (e.g., `[rulesets.invalidlinter]`) passes validation and is silently ignored at runtime. Users could misconfigure their rulesets without any warning.
+
+**Steps to Reproduce:**
+```bash
+cat > cmc.toml << 'EOF'
+[project]
+name = "test"
+
+[rulesets.invalidlinter]
+enabled = true
+rules = { "some-rule" = "error" }
+EOF
+
+cmc validate
+# Output: ✓ cmc.toml is valid
+
+cmc check .
+# Runs without any warning about invalid linter
+```
+
+**Expected Behavior:** Validation should fail for unknown linter names. Valid linters are: `eslint`, `ruff`, `tsc`.
+
+**Actual Behavior:** Invalid linter names are accepted and silently ignored.
+
+---
+
+## Fixed Bugs
+
+### ~~BUG: `--quiet --json` Flags Together Produce No Output~~ ✅ FIXED in v1.6.3
 
 **Severity:** Medium
 
@@ -22,9 +101,11 @@ echo $?
 
 **Actual Behavior:** No output at all, only exit code.
 
+**Fix:** v1.6.3 now correctly outputs JSON when both flags are used together.
+
 ---
 
-### BUG: Invalid `[extends]` Entries Are Silently Ignored
+### ~~BUG: Invalid `[extends]` Entries Are Silently Ignored~~ ✅ FIXED in v1.6.3
 
 **Severity:** High
 
@@ -56,9 +137,14 @@ cmc validate
 
 **Actual Behavior:** All invalid extends are silently ignored, `cmc validate` reports config as valid.
 
+**Fix:** v1.6.3 now validates extends entries:
+- Unknown keys in `[extends]` are rejected
+- Invalid `github:` format strings are rejected with pattern validation
+- Only `github:owner/repo/path@version` format is now accepted
+
 ---
 
-### BUG: `[tools]` Section Does Not Disable Linters
+### ~~BUG: `[tools]` Section Does Not Disable Linters~~ ✅ FIXED in v1.6.3
 
 **Severity:** High
 
@@ -89,9 +175,9 @@ cmc check .
 
 **Note:** TSC requires `[rulesets.tsc] enabled = true` to run, but `[tools] tsc = true` alone does nothing. This is inconsistent - either `[tools]` should work for all linters, or documentation should clarify the correct configuration.
 
----
+**Fix:** v1.6.3 now correctly respects `[tools]` settings. Setting `eslint = false` or `ruff = false` properly disables those linters.
 
-## Fixed Bugs
+---
 
 ### ~~BUG: Race Condition When Multiple Extends Reference Same Repository~~ ✅ FIXED in v1.6.2
 
@@ -137,6 +223,6 @@ Error: Failed to load rulesets.json manifest: Failed to clone...: fatal: could n
 
 ## Test Environment
 - **OS:** macOS Darwin 24.6.0
-- **cmc version:** 1.6.2
+- **cmc version:** 1.6.3
 - **Node version:** >= 20 (as required)
 - **Install method:** npm global install
