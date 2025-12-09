@@ -1,0 +1,6 @@
+[project]
+name = "test-race-condition"
+
+[extends]
+eslint = "github:chrismlittle123/check-my-code-community/rulesets/production/typescript/5.5/eslint@latest"
+ruff = "github:chrismlittle123/check-my-code-community/rulesets/production/python/3.12@latest"
