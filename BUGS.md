@@ -1,10 +1,112 @@
 # Bugs Found in check-my-code (cmc)
 
-> **Last Verified:** December 9, 2025 against v1.6.3
+> **Last Verified:** December 9, 2025 against v1.6.5
 
 ## Active Bugs
 
-### BUG: `[files]` Section `include`/`exclude` Patterns Have No Effect
+### BUG: `[rulesets]` Config Not Applied Without Running `cmc generate` First
+
+**Severity:** High
+
+**Description:** Linter configurations defined in `[rulesets.eslint]` or `[rulesets.ruff]` sections of `cmc.toml` are NOT applied during `cmc check` unless you first manually run `cmc generate <linter>` to create the config files. This is a significant usability issue as users expect `cmc.toml` to be the source of truth.
+
+**Steps to Reproduce:**
+```bash
+rm -f eslint.config.js ruff.toml
+
+cat > cmc.toml << 'EOF'
+[project]
+name = "test"
+
+[rulesets.eslint]
+rules = { "no-console" = "off" }
+
+[rulesets.ruff.lint]
+ignore = ["F401"]
+EOF
+
+echo 'console.log("test");' > test.ts
+echo 'import os' > test.py
+
+cmc check .
+# Expected: no-console should be off, F401 should be ignored
+# Actual: Both rules still trigger violations!
+```
+
+**Expected Behavior:** Rules defined in `cmc.toml` should be applied directly during `cmc check` without needing to generate config files.
+
+**Actual Behavior:** Rules are ignored unless you first run:
+```bash
+cmc generate eslint --force
+cmc generate ruff --force
+```
+
+**Workaround:** Always run `cmc generate <linter>` after modifying `cmc.toml` rulesets, or add it to your workflow.
+
+---
+
+### BUG: Invalid `[prompts]` Templates Pass Validation But Fail at Runtime
+
+**Severity:** Medium
+
+**Description:** Invalid template names in `[prompts].templates` pass schema validation but fail at runtime when using `cmc context`. Templates should be validated against the known list during `cmc validate`.
+
+**Steps to Reproduce:**
+```bash
+cat > cmc.toml << 'EOF'
+[project]
+name = "test"
+
+[prompts]
+templates = ["invalid/template/name"]
+EOF
+
+cmc validate
+# Output: ✓ cmc.toml is valid
+
+cmc context --target claude
+# Output: Error: Template "invalid/template/name" not found.
+```
+
+**Expected Behavior:** `cmc validate` should reject invalid template names with an error listing valid templates.
+
+**Actual Behavior:** Validation passes, error only appears at runtime.
+
+**Valid Templates:** `prototype/python/3.12`, `prototype/typescript/5.5`, `internal/python/3.12`, `internal/typescript/5.5`, `production/python/3.12`, `production/typescript/5.5`
+
+---
+
+### BUG: Non-Lintable Files Counted as "Checked"
+
+**Severity:** Low
+
+**Description:** Files without recognized extensions (or with non-lintable extensions like `.json`) are reported in the "files checked" count, even though no linter actually processes them.
+
+**Steps to Reproduce:**
+```bash
+cat > cmc.toml << 'EOF'
+[project]
+name = "test"
+EOF
+
+echo 'const x = 1;' > noextension
+echo '{"test": true}' > config.json
+
+cmc check noextension config.json
+# Output: ✓ No violations found (2 files checked)
+```
+
+**Expected Behavior:** Either:
+1. Only count files that were actually linted, or
+2. Warn that files have unrecognized extensions
+
+**Actual Behavior:** Files are counted as "checked" even though no linter ran on them, which is misleading.
+
+---
+
+## Fixed Bugs
+
+### ~~BUG: `[files]` Section `include`/`exclude` Patterns Have No Effect~~ ✅ FIXED in v1.6.5
 
 **Severity:** High
 
@@ -49,9 +151,11 @@ cmc validate
 # Output: ✓ cmc.toml is valid
 ```
 
+**Fix:** v1.6.5 now correctly respects `[files]` include/exclude patterns and rejects unknown keys in the `[files]` section.
+
 ---
 
-### BUG: Invalid Linter Names in `[rulesets]` Are Silently Ignored
+### ~~BUG: Invalid Linter Names in `[rulesets]` Are Silently Ignored~~ ✅ FIXED in v1.6.5
 
 **Severity:** Medium
 
@@ -79,9 +183,9 @@ cmc check .
 
 **Actual Behavior:** Invalid linter names are accepted and silently ignored.
 
----
+**Fix:** v1.6.5 now validates linter names and rejects unknown properties in `[rulesets]` with error: "has unknown property 'invalidlinter'".
 
-## Fixed Bugs
+---
 
 ### ~~BUG: `--quiet --json` Flags Together Produce No Output~~ ✅ FIXED in v1.6.3
 
@@ -223,6 +327,6 @@ Error: Failed to load rulesets.json manifest: Failed to clone...: fatal: could n
 
 ## Test Environment
 - **OS:** macOS Darwin 24.6.0
-- **cmc version:** 1.6.3
+- **cmc version:** 1.6.5
 - **Node version:** >= 20 (as required)
 - **Install method:** npm global install
