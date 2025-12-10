@@ -1,14 +1,233 @@
 # Bugs Found in check-my-code (cmc)
 
-> **Last Verified:** December 10, 2025 against v1.7.0
+> **Last Verified:** December 10, 2025 against v1.8.0
 
 ## Active Bugs
 
-No active bugs at this time.
+### BUG: MCP Server Path Traversal Vulnerability in check_files
+
+**Severity:** High (Security)
+
+**Description:** The MCP `check_files` tool does not properly validate file paths. When a path with directory traversal sequences (e.g., `../../../../../../etc/passwd`) is passed, the MCP server changes its `project_root` to the traversed directory instead of rejecting the request. This allows potential access to files outside the intended project directory.
+
+**Steps to Reproduce:**
+```bash
+# Start MCP server and call check_files with path traversal
+# Via MCP client:
+check_files({ files: ["../../../../../../etc/passwd"] })
+
+# Then call get_status to see the project_root changed:
+get_status()
+# Returns: { "project_root": "/etc", ... }
+```
+
+**Expected Behavior:** The MCP server should:
+1. Reject paths that contain `..` sequences
+2. Validate that resolved paths remain within the project root
+3. Return a security error for path traversal attempts
+
+**Actual Behavior:** The `project_root` is changed to follow the traversal path (e.g., `/etc`), potentially exposing sensitive system information.
+
+**Impact:** AI agents using the MCP server could be tricked into reading files outside the project directory.
+
+---
+
+### BUG: Confusing Version Semantics in [extends] - Git Ref vs Manifest Version
+
+**Severity:** Medium (UX)
+
+**Description:** The `[extends]` feature uses `@version` syntax that is ambiguous and confusing. The version after `@` is NOT a git ref (branch/tag), but rather a manifest version from `rulesets.json`. However, error messages and initial attempts to clone use it as a git ref, leading to confusing errors.
+
+**Steps to Reproduce:**
+```bash
+cat > cmc.toml << 'EOF'
+[project]
+name = "test"
+
+[extends]
+eslint = "github:chrismlittle123/check-my-code-community/production/typescript/5.5/eslint@1.0.0"
+EOF
+
+rm -rf ~/.cmc/cache/
+cmc generate eslint
+# Error: Failed to clone... fatal: Remote branch 1.0.0 not found
+```
+
+**Expected Behavior:** Either:
+1. The `@version` should be a git ref (branch/tag), OR
+2. The syntax should be clearer, like `github:owner/repo@gitref#ruleset/path:manifest-version`
+
+**Actual Behavior:**
+- First, cmc fetches the repo at `@latest` (hardcoded?) to read `rulesets.json`
+- Then it tries to use the `@version` to fetch again, failing if it's not a git ref
+- Using `@main` fails because it's not in the manifest
+- Only `@latest` works, which is resolved from the manifest
+
+**Workaround:** Always use `@latest` in extends:
+```toml
+[extends]
+eslint = "github:chrismlittle123/check-my-code-community/production/typescript/5.5/eslint@latest"
+```
+
+---
+
+### BUG: Local Rule Overrides Not Allowed with Extends (Design Question)
+
+**Severity:** Low (UX/Design)
+
+**Description:** When using `[extends]` to inherit from a remote ruleset, local rules in `[rulesets.eslint.rules]` cannot override inherited rules. Any conflict results in an error requiring removal of the local rule.
+
+**Steps to Reproduce:**
+```bash
+cat > cmc.toml << 'EOF'
+[project]
+name = "test"
+
+[extends]
+eslint = "github:chrismlittle123/check-my-code-community/production/typescript/5.5/eslint@latest"
+
+[rulesets.eslint.rules]
+no-console = "warn"  # Trying to relax inherited "error" to "warn"
+EOF
+
+cmc generate eslint
+# Error: Config conflict detected
+#   Setting: "no-console" (eslint)
+#   Inherited value: "error"
+#   Local value: "warn"
+# Local config cannot override inherited config.
+```
+
+**Expected Behavior:** Users should be able to override inherited rules for local customization (with optional warning).
+
+**Actual Behavior:** Conflicts are rejected outright. Users can only ADD new rules, not modify inherited ones.
+
+**Note:** This may be intentional design to enforce consistency. However, the inability to relax rules locally limits the flexibility of the extends feature.
+
+---
+
+## Design Notes / Expected Behavior
+
+These items were initially reported as bugs but are actually intentional design decisions or working as expected.
+
+### TSC Type Checking Configuration
+
+**Status:** Working as expected
+
+TSC runs correctly when `[rulesets.tsc]` is properly configured. The key is to use the correct configuration options directly in the `[rulesets.tsc]` section (e.g., `strict = true`, `noUncheckedIndexedAccess = true`), not nested under an `options` key.
+
+**Correct Configuration:**
+```toml
+[rulesets.tsc]
+enabled = true
+strict = true
+noUncheckedIndexedAccess = true
+noImplicitReturns = true
+```
+
+---
+
+### `cmc generate tsc` Options
+
+**Status:** Working as expected
+
+Options ARE included in the generated tsconfig.json output when configured correctly. Use top-level keys in `[rulesets.tsc]` like `strict`, `noUncheckedIndexedAccess`, `noImplicitReturns`.
+
+---
+
+### `cmc generate ruff` Configuration
+
+**Status:** Working as expected
+
+Rules ARE included in the generated ruff.toml when using the correct schema. Use `line-length`, `[rulesets.ruff.lint]` with `select` and `ignore` arrays.
+
+**Correct Configuration:**
+```toml
+[rulesets.ruff]
+line-length = 100
+
+[rulesets.ruff.lint]
+select = ["E", "F", "I", "UP"]
+ignore = ["E501"]
+```
+
+---
+
+### ESLint Rule Names Not Validated at Config Time
+
+**Status:** Intentional design
+
+ESLint rule names are arbitrary strings that depend on installed plugins. The tool cannot validate rule names at config time because:
+1. Different projects use different ESLint plugins
+2. Plugin rules are discovered at runtime by ESLint itself
+3. Custom rules can have any name
+
+Invalid rules will cause ESLint to fail at runtime with an appropriate error.
+
+---
+
+### `cmc audit` Allows Stricter Configs (warn → error)
+
+**Status:** Intentional design
+
+The audit command intentionally allows configs to be *stricter* than the cmc.toml baseline. This means:
+- Changing `"warn"` to `"error"` in eslint.config.js is allowed (stricter)
+- Changing `"error"` to `"warn"` IS detected as a mismatch (weaker)
+- Changing to `"off"` IS detected as a mismatch (weaker)
+
+This design allows teams to have a baseline config in cmc.toml while individual projects can opt into stricter rules.
 
 ---
 
 ## Fixed Bugs
+
+### ~~BUG: Unknown Top-Level Sections in cmc.toml Are Silently Accepted~~ ✅ FIXED in v1.7.2
+
+**Severity:** Medium
+
+**Description:** Unknown top-level sections in cmc.toml passed validation without any warning or error.
+
+**Fix:** v1.7.2 now rejects unknown top-level sections:
+```
+✗ cmc.toml has validation errors:
+  - /: has unknown property 'totally_made_up_section'
+```
+
+---
+
+### ~~BUG: Unknown Properties in `[project]` Section Are Silently Accepted~~ ✅ FIXED in v1.7.2
+
+**Severity:** Medium
+
+**Description:** Unknown properties within the `[project]` section passed validation without any warning.
+
+**Fix:** v1.7.2 now rejects unknown properties in `[project]`:
+```
+✗ cmc.toml has validation errors:
+  - /project: has unknown property 'unknown_key'
+```
+
+---
+
+### ~~BUG: Race Condition in `cmc context` When Fetching Remote Templates~~ ✅ FIXED in v1.7.2
+
+**Severity:** High
+
+**Description:** Running multiple concurrent `cmc context` commands caused a race condition when cloning the remote templates repository.
+
+**Fix:** v1.7.2 now handles concurrent context commands correctly with proper file locking.
+
+---
+
+### ~~BUG: Duplicate Templates in `[prompts]` Are Accepted and Duplicated in Output~~ ✅ FIXED in v1.7.2
+
+**Severity:** Low
+
+**Description:** When the same template was listed multiple times in `[prompts].templates`, content was duplicated in the output file.
+
+**Fix:** v1.7.2 now deduplicates templates when generating output (duplicate templates in config are still accepted but only output once).
+
+---
 
 ### ~~BUG: Invalid `[prompts]` Templates Pass Validation But Fail at Runtime~~ ✅ FIXED in v1.7.0
 
@@ -298,6 +517,6 @@ Error: Failed to load rulesets.json manifest: Failed to clone...: fatal: could n
 
 ## Test Environment
 - **OS:** macOS Darwin 24.6.0
-- **cmc version:** 1.7.0
+- **cmc version:** 1.8.0
 - **Node version:** >= 20 (as required)
 - **Install method:** npm global install
