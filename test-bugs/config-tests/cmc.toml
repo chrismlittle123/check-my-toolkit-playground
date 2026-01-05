@@ -1,5 +1,0 @@
-[project]
-name = "test"
-
-[rulesets.eslint]
-extends = ["eslint"]

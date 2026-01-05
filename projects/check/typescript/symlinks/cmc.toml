@@ -1,5 +1,0 @@
-[project]
-name = "symlinks-test"
-
-[rulesets.eslint.rules]
-"no-var" = "error"

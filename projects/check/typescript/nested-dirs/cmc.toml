@@ -1,6 +1,0 @@
-[project]
-name = "nested-dirs-test"
-
-[rulesets.eslint.rules]
-"no-var" = "error"
-"prefer-const" = "error"

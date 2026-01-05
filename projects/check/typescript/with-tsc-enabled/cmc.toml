@@ -1,8 +1,0 @@
-[project]
-name = "tsc-enabled-test"
-
-[rulesets.tsc]
-strict = true
-
-[rulesets.eslint.rules]
-"no-var" = "error"

@@ -1,5 +1,0 @@
-[project]
-name = "test"
-
-[rulesets.ruff]
-rules = { "F401" = false }

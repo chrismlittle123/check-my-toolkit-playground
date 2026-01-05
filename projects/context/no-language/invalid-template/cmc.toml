@@ -1,6 +1,0 @@
-[project]
-name = "invalid-template-test"
-
-[prompts]
-# Valid source, but nonexistent template name
-templates = ["nonexistent-template-xyz"]

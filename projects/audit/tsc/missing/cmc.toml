@@ -1,5 +1,0 @@
-[project]
-name = "audit-tsc-missing-test"
-
-[rulesets.tsc]
-strict = true

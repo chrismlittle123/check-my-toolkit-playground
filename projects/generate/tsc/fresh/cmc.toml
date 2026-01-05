@@ -1,7 +1,0 @@
-[project]
-name = "generate-tsc-fresh-test"
-
-[rulesets.tsc]
-strict = true
-noUncheckedIndexedAccess = true
-noImplicitReturns = true

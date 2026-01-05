@@ -1,7 +1,0 @@
-[project]
-name = "no-tsc-test"
-
-# No [rulesets.tsc] section - type checking should NOT run
-
-[rulesets.eslint.rules]
-"no-var" = "error"
