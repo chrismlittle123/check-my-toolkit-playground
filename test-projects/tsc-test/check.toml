@@ -1,0 +1,11 @@
+# TypeScript test configuration
+
+[code.types.tsc]
+enabled = true
+
+[code.types.tsc.require]
+strict = true
+noImplicitAny = true
+strictNullChecks = true
+noUnusedLocals = true
+noUnusedParameters = true

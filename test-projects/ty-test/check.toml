@@ -1,0 +1,4 @@
+# ty test configuration
+
+[code.types.ty]
+enabled = true

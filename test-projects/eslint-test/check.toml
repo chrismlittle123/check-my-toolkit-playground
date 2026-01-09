@@ -1,0 +1,11 @@
+# ESLint test configuration
+
+[code.linting.eslint]
+enabled = true
+files = ["src/**/*.ts"]
+ignore = ["**/*.test.ts"]
+max-warnings = 5
+
+[code.linting.eslint.rules]
+"no-unused-vars" = "error"
+"no-console" = { severity = "warn" }

@@ -1,0 +1,10 @@
+# Ruff test configuration
+
+[code.linting.ruff]
+enabled = true
+format = true
+line-length = 88
+
+[code.linting.ruff.lint]
+select = ["E", "F", "W"]
+ignore = ["E501"]

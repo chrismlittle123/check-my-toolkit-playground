@@ -1,0 +1,4 @@
+# Prettier test configuration
+
+[code.formatting.prettier]
+enabled = true
